@@ -11,7 +11,7 @@ const PIXELS_PER_MINUTE = 1 / MINUTES_PER_PIXEL;
 
 const DEFAULT_TASK = {
   title: "New Task",
-  color: "color-blue",     // uses the Google-y color classes
+  color: "color-blue",
   startMin: (9 - START_HOUR) * 60,
   durationMin: 60
 };
@@ -26,7 +26,7 @@ renderAllTasks();
 wireTopButtons();
 wireAddButtons();
 setupDropzones();
-drawNowLine(); // optional visual
+drawNowLine();
 setInterval(drawNowLine, 60 * 1000);
 
 /***** STORAGE *****/
@@ -71,7 +71,6 @@ function buildDayColumns(){
       dayCanvas.appendChild(line);
     }
 
-    // container for now-line per day
     const nowLine = document.createElement("div");
     nowLine.className = "now-line";
     nowLine.style.display = "none";
@@ -105,15 +104,11 @@ function renderTask(dayEl, task){
   const hBot = document.createElement("div"); hBot.className="resize-handle bottom";
   node.appendChild(hTop); node.appendChild(hBot);
 
-  // interactions
   enableInteract(node);
 
-  // quick color cycle
   node.addEventListener('click', e=>{
     if(e.detail===1){ cycleColor(task,node); saveToStorage(); }
   });
-
-  // rename
   node.addEventListener('dblclick', ()=>{
     const t = prompt("Task name:", task.title);
     if(t!==null){
@@ -127,34 +122,51 @@ function renderTask(dayEl, task){
   dayEl.appendChild(node);
 }
 
-/***** INTERACT *****/
+/***** INTERACT: DRAG + RESIZE *****/
 function enableInteract(el){
+  // LIVE drag feedback: accumulate top with event.dy
   interact(el).draggable({
     inertia:false,
     listeners:{
-      start(){ el.classList.add('dragging'); el._startTop = parseFloat(el.style.top)||0; },
-      move(evt){
-        const dy = evt.dy||0;
-        const newTop = clamp(el._startTop + dy, 0, dayHeight() - minTaskHeight());
-        el.style.top = `${newTop}px`;
+      start(){
+        el.classList.add('dragging');
+        el._dragTop = parseFloat(el.style.top) || 0;
       },
-      end(){ el.classList.remove('dragging'); snapAndPersist(el); }
+      move(evt){
+        el._dragTop = clamp(el._dragTop + (evt.dy || 0), 0, dayHeight() - minTaskHeight());
+        el.style.top = `${el._dragTop}px`;
+      },
+      end(){
+        el.classList.remove('dragging');
+        snapAndPersist(el);
+      }
     }
   });
 
+  // Reliable resizing using the explicit handles + deltaRect
   interact(el).resizable({
-    edges:{top:true,bottom:true,left:false,right:false},
-    listeners:{
-      move(evt){
-        const dayEl = el.parentElement;
-        const topLocal = clamp(evt.rect.y - dayEl.getBoundingClientRect().top + dayEl.scrollTop, 0, dayHeight());
-        const bottom = clamp(topLocal + evt.rect.height, 0, dayHeight());
-        const h = Math.max(bottom - topLocal, minTaskHeight());
-        el.style.top = `${topLocal}px`;
-        el.style.height = `${h}px`;
-      },
-      end(){ snapAndPersist(el); }
-    }
+    edges: { top: '.resize-handle.top', bottom: '.resize-handle.bottom' },
+    inertia:false
+  })
+  .on('resizestart', ()=> el.classList.add('dragging'))
+  .on('resizemove', (evt)=>{
+    const currentTop = parseFloat(el.style.top) || 0;
+    const currentH   = parseFloat(el.style.height) || minTaskHeight();
+
+    // deltaRect gives change since the last move
+    let newTop = currentTop + (evt.deltaRect.top || 0);
+    let newH   = currentH   + (evt.deltaRect.height || 0);
+
+    // clamp within day bounds
+    newTop = clamp(newTop, 0, dayHeight() - minTaskHeight());
+    newH   = clamp(newH,  minTaskHeight(), dayHeight() - newTop);
+
+    el.style.top = `${newTop}px`;
+    el.style.height = `${newH}px`;
+  })
+  .on('resizeend', ()=>{
+    el.classList.remove('dragging');
+    snapAndPersist(el);
   });
 }
 
@@ -170,15 +182,17 @@ function setupDropzones(){
       const moved = takeTaskFromDay(from, card.dataset.id);
       if(!moved) return;
 
+      // Add to new day *before* snapping so persistence works
+      tasks[to].push(moved);
+
       evt.target.appendChild(card);
       card.dataset.day = to;
 
       const rect = evt.target.getBoundingClientRect();
-      const y = clamp((evt.dragEvent?.clientY ?? rect.top) - rect.top + evt.target.scrollTop, 0, dayHeight()-minTaskHeight());
+      const y = clamp((evt.dragEvent?.clientY ?? rect.top) - rect.top + evt.target.scrollTop,
+                      0, dayHeight()-minTaskHeight());
       card.style.top = `${y}px`;
       snapAndPersist(card);
-
-      tasks[to].push(moved);
       saveToStorage();
     }
   });
@@ -202,8 +216,12 @@ function snapAndPersist(el){
   el.style.top = `${Math.min(top, snapPx(maxTop))}px`;
   el.style.height = `${height}px`;
 
-  t.startMin   = yToMinutes(parseFloat(el.style.top));
-  t.durationMin = Math.max(SLOT_MINUTES, Math.round(parseFloat(el.style.height)*MINUTES_PER_PIXEL / SLOT_MINUTES)*SLOT_MINUTES);
+  t.startMin    = yToMinutes(parseFloat(el.style.top));
+  t.durationMin = Math.max(
+    SLOT_MINUTES,
+    Math.round(parseFloat(el.style.height)*MINUTES_PER_PIXEL / SLOT_MINUTES)*SLOT_MINUTES
+  );
+
   saveToStorage();
 }
 
@@ -253,7 +271,7 @@ function addTask(day, partial={}){
   renderTask(document.getElementById(`day-${day}`), t);
 }
 
-/***** NOW LINE (optional, purely visual) *****/
+/***** NOW LINE (visual only) *****/
 function drawNowLine(){
   const now = new Date();
   const minutes = now.getHours()*60 + now.getMinutes();
@@ -278,7 +296,8 @@ function formatHour(h){
 }
 function minutesToY(mins){ return Math.round(mins * PIXELS_PER_MINUTE); }
 function yToMinutes(y){
-  return clamp(Math.round(y * MINUTES_PER_PIXEL / SLOT_MINUTES)*SLOT_MINUTES, 0, (END_HOUR-START_HOUR)*60);
+  return clamp(Math.round(y * MINUTES_PER_PIXEL / SLOT_MINUTES)*SLOT_MINUTES,
+               0, (END_HOUR-START_HOUR)*60);
 }
 function snapPx(px){ return Math.round(px / SLOT_HEIGHT) * SLOT_HEIGHT; }
 function minTaskHeight(){ return SLOT_HEIGHT; }
