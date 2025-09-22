@@ -1,0 +1,140 @@
+:root{
+  --bg: #f7fafc;
+  --card: #ffffff;
+  --ink: #0f172a;
+  --dash: #e2e8f0;
+  --ring: #60a5fa;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: linear-gradient(180deg, var(--bg), #eef2f7);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* The vertical working area height; JS reads this too */
+:root {
+  --slot-height: 20px;   /* height for 30 minutes */
+  --start-hour: 5;       /* 5:00 */
+  --end-hour: 23;        /* 23:00 */
+}
+
+/* ===== Timeline ===== */
+.timeline {
+  position: relative;
+  background: var(--card);
+  border-radius: 12px;
+  padding: 6px 0;
+  outline: 2px dashed var(--dash);
+  outline-offset: -8px;
+  overflow: hidden;
+}
+
+/* One “row” per 30 minutes for the time grid */
+.time-row {
+  position: relative;
+  height: var(--slot-height);
+  border-top: 1px dashed #e5e7eb; /* light line for every 30 min */
+}
+.time-row.hour {
+  border-top: 1px solid #cbd5e1; /* darker on the hour */
+}
+.time-label {
+  position: absolute;
+  top: -0.6rem;
+  left: 8px;
+  font-size: 0.75rem;
+  color: #475569;
+  background: #ffffff;
+  padding: 0 4px;
+  border-radius: 6px;
+}
+
+/* ===== Day Columns ===== */
+.day-col {
+  background: var(--card);
+  border-radius: 14px;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06);
+  padding: 0;
+  overflow: hidden;
+}
+
+/* The scheduling canvas inside each day */
+.day {
+  position: relative;
+  background: #f8fafc;
+  outline: 2px dashed var(--dash);
+  outline-offset: -8px;
+  height: calc((var(--end-hour) - var(--start-hour)) * 2 * var(--slot-height)); /* hours * 2 slots/hour */
+  /* Scroll if content extends (if you enable bigger ranges later) */
+  overflow-y: hidden;
+}
+
+/* Horizontal grid lines (mirror timeline) */
+.day .grid-row {
+  pointer-events: none;
+  position: absolute;
+  left: 0; right: 0;
+  height: 1px;
+  background: #e5e7eb;
+  opacity: 0.6;
+}
+.day .grid-row.hour {
+  background: #cbd5e1;
+  opacity: 1;
+}
+
+/* ===== Tasks ===== */
+.task {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  min-height: calc(var(--slot-height)); /* at least 30 minutes */
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+  user-select: none;
+  cursor: grab;
+  transition: box-shadow .12s ease, opacity .12s ease, transform .12s ease;
+  will-change: transform, height, top;
+  border: 2px solid transparent;
+}
+
+.task:active { cursor: grabbing; }
+
+.task.dragging {
+  opacity: 0.95;
+  transform: scale(1.01);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+  border-color: var(--ring);
+}
+
+/* Resize handles (top/bottom) */
+.task .resize-handle {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.14);
+  opacity: 0.7;
+}
+.task .resize-handle.top { top: -4px; }
+.task .resize-handle.bottom { bottom: -4px; }
+
+/* Simple palette (you can extend) */
+.bg-yellow-200 { background: #fef9c3; }
+.bg-blue-200   { background: #bfdbfe; }
+.bg-green-200  { background: #bbf7d0; }
+.bg-pink-200   { background: #fbcfe8; }
+.bg-purple-200 { background: #ddd6fe; }
+.bg-orange-200 { background: #fed7aa; }
+
+/* Buttons */
+button { transition: transform .08s ease, box-shadow .12s ease; }
+button:active { transform: translateY(1px); }
