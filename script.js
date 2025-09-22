@@ -4,10 +4,9 @@ const START_HOUR = 5;
 const END_HOUR   = 23;
 const SLOT_MINUTES = 30;
 
-const SLOT_HEIGHT = parseInt(getComputedStyle(document.documentElement)
-  .getPropertyValue('--slot-height')) || 24;
-const MINUTES_PER_PIXEL = SLOT_MINUTES / SLOT_HEIGHT;
-const PIXELS_PER_MINUTE = 1 / MINUTES_PER_PIXEL;
+let SLOT_HEIGHT = readSlotHeight();               // px per 30-min slot (dynamic)
+let MINUTES_PER_PIXEL = SLOT_MINUTES / SLOT_HEIGHT;
+let PIXELS_PER_MINUTE = 1 / MINUTES_PER_PIXEL;
 
 const DEFAULT_TASK = {
   title: "New Task",
@@ -26,12 +25,29 @@ renderAllTasks();
 wireTopButtons();
 wireAddButtons();
 setupDropzones();
+fitCalendarToViewport();         // <- compute height & slot size initially
 drawNowLine();
 setInterval(drawNowLine, 60 * 1000);
+window.addEventListener('resize', debounce(()=> {
+  fitCalendarToViewport();
+  drawNowLine();
+}, 80));
 
 /***** STORAGE *****/
 function saveToStorage(){ localStorage.setItem("tasks_v3", JSON.stringify(tasks)); }
 function loadFromStorage(){ try{ return JSON.parse(localStorage.getItem("tasks_v3")) || {}; }catch{ return {}; }}
+
+/***** UTILS FOR DYNAMIC METRICS *****/
+function readSlotHeight(){
+  return parseFloat(getComputedStyle(document.documentElement)
+    .getPropertyValue('--slot-height')) || 24;
+}
+function setSlotHeight(px){
+  document.documentElement.style.setProperty('--slot-height', `${px}px`);
+  SLOT_HEIGHT = px;
+  MINUTES_PER_PIXEL = SLOT_MINUTES / SLOT_HEIGHT;
+  PIXELS_PER_MINUTE = 1 / MINUTES_PER_PIXEL;
+}
 
 /***** TIMELINE *****/
 function buildTimeline(){
@@ -89,6 +105,7 @@ function renderAllTasks(){
     [...el.querySelectorAll('.task')].forEach(n=>n.remove());
     tasks[day].forEach(t => renderTask(el,t));
   }
+  autosizeAllTaskText();
 }
 
 function renderTask(dayEl, task){
@@ -98,8 +115,14 @@ function renderTask(dayEl, task){
   node.dataset.day = dayEl.dataset.day;
   node.style.top = `${minutesToY(task.startMin)}px`;
   node.style.height = `${task.durationMin * PIXELS_PER_MINUTE}px`;
-  node.textContent = task.title;
 
+  // title container for clamping/auto-size
+  const title = document.createElement('div');
+  title.className = 'task-title';
+  title.textContent = task.title;
+  node.appendChild(title);
+
+  // resize handles
   const hTop = document.createElement("div"); hTop.className="resize-handle top";
   const hBot = document.createElement("div"); hBot.className="resize-handle bottom";
   node.appendChild(hTop); node.appendChild(hBot);
@@ -115,13 +138,14 @@ function renderTask(dayEl, task){
     const t = prompt("Task name:", task.title);
     if(t!==null){
       task.title = t.trim() || task.title;
-      node.textContent = task.title;
-      node.appendChild(hTop); node.appendChild(hBot);
+      node.querySelector('.task-title').textContent = task.title;
       saveToStorage();
+      autosizeTaskText(node);
     }
   });
 
   dayEl.appendChild(node);
+  autosizeTaskText(node);
 }
 
 /***** INTERACT: DRAG + RESIZE *****
@@ -130,39 +154,33 @@ function renderTask(dayEl, task){
 ************************************/
 function enableInteract(el){
   // DRAG
-  interact(el).draggable({
-    inertia:false
-  })
-  .on('dragstart', (evt)=>{
+  interact(el).draggable({ inertia:false })
+  .on('dragstart', ()=>{
     el.classList.add('dragging');
-    // store starting top and reset live translation
     el._startTop = parseFloat(el.style.top) || 0;
     el._dy = 0;
     el.style.transform = 'translateY(0px)';
   })
   .on('dragmove', (evt)=>{
-    // live feedback via translateY
     el._dy += evt.dy || 0;
-    el.style.transform = `translateY(${el._dy}px)`;
+    el.style.transform = `translateY(${el._dy}px)`;   // live feedback
   })
-  .on('dragend', (evt)=>{
-    // commit: remove transform and write snapped top
-    const height = parseFloat(el.style.height) || minTaskHeight();
-    const targetTop = clamp(el._startTop + el._dy, 0, dayHeight() - height);
+  .on('dragend', ()=>{
+    const h = parseFloat(el.style.height) || minTaskHeight();
+    const targetTop = clamp(el._startTop + el._dy, 0, dayHeight() - h);
     el.style.transform = 'translateY(0px)';
     el.style.top = `${snapPx(targetTop)}px`;
-
     el.classList.remove('dragging');
     snapAndPersist(el);
+    autosizeTaskText(el);
   });
 
-  // RESIZE (edges, not the whole card)
+  // RESIZE
   interact(el).resizable({
     edges: { top: true, bottom: true, left: false, right: false },
     inertia:false
   })
   .on('resizestart', ()=>{
-    // ensure we don't have a leftover drag transform
     el.style.transform = 'translateY(0px)';
     el.classList.add('dragging');
   })
@@ -170,20 +188,20 @@ function enableInteract(el){
     const curTop = parseFloat(el.style.top) || 0;
     const curH   = parseFloat(el.style.height) || minTaskHeight();
 
-    // use deltas to grow/shrink; Interact gives us changes since last event
     let newTop = curTop + (evt.deltaRect.top || 0);
     let newH   = curH   + (evt.deltaRect.height || 0);
 
-    // keep within day bounds
     newTop = clamp(newTop, 0, dayHeight() - minTaskHeight());
     newH   = clamp(newH,   minTaskHeight(), dayHeight() - newTop);
 
     el.style.top = `${newTop}px`;
     el.style.height = `${newH}px`;
+    autosizeTaskText(el);
   })
   .on('resizeend', ()=>{
     el.classList.remove('dragging');
     snapAndPersist(el);
+    autosizeTaskText(el);
   });
 }
 
@@ -199,26 +217,23 @@ function setupDropzones(){
       const moved = takeTaskFromDay(from, card.dataset.id);
       if(!moved) return;
 
-      // add to new data set first
       tasks[to].push(moved);
-
-      // move DOM
       evt.target.appendChild(card);
       card.dataset.day = to;
 
-      // compute local Y using pointer position
       const rect = evt.target.getBoundingClientRect();
       const y = clamp((evt.dragEvent?.clientY ?? rect.top) - rect.top + evt.target.scrollTop,
                       0, dayHeight()-minTaskHeight());
-      // commit immediate visual and data
       card.style.transform = 'translateY(0px)';
       card.style.top = `${snapPx(y)}px`;
       snapAndPersist(card);
       saveToStorage();
+      autosizeTaskText(card);
     }
   });
 }
 
+/***** PERSIST/SNAP *****/
 function takeTaskFromDay(day, id){
   const i = tasks[day].findIndex(t=>t.id===id);
   if(i>=0){ const [t]=tasks[day].splice(i,1); return t; }
@@ -230,7 +245,6 @@ function snapAndPersist(el){
   const t = findTask(day, el.dataset.id);
   if(!t) return;
 
-  // snap to 30-min grid
   const top = snapPx(parseFloat(el.style.top) || 0);
   const height = Math.max(minTaskHeight(), snapPx(parseFloat(el.style.height) || minTaskHeight()));
   const maxTop = dayHeight() - height;
@@ -249,48 +263,59 @@ function snapAndPersist(el){
 
 function findTask(day,id){ return tasks[day].find(t=>t.id===id); }
 
-/***** UI BUTTONS *****/
-function wireTopButtons(){
-  document.getElementById("exportBtn").addEventListener("click", ()=>{
-    const data = "data:text/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(tasks,null,2));
-    const a = document.createElement("a"); a.href=data; a.download="planner.json"; a.click();
+/***** FIT TO VIEWPORT (vertical responsiveness) *****/
+function fitCalendarToViewport(){
+  const body = document.querySelector('.cal-body');
+  const totalSlots = (END_HOUR - START_HOUR) * 2;
+
+  // How much vertical space do we have from the top of the grid to bottom of viewport?
+  const top = body.getBoundingClientRect().top + window.scrollY;
+  const available = window.innerHeight - (body.getBoundingClientRect().top) - 24; // 24px bottom buffer
+
+  // Choose slot size; keep a sensible minimum so tasks remain clickable
+  const slot = Math.max(12, available / totalSlots);
+
+  // Apply to CSS var and set the body height (so everything lines up)
+  setSlotHeight(slot);
+  body.style.height = `${slot * totalSlots}px`;
+
+  // Reposition grid lines (we set absolute tops in build)
+  document.querySelectorAll('.day').forEach(dayEl=>{
+    const lines = dayEl.querySelectorAll('.grid-row');
+    lines.forEach((line, idx)=> line.style.top = `${idx * SLOT_HEIGHT}px`);
   });
-  document.getElementById("importBtn").addEventListener("click", ()=> document.getElementById("importFile").click());
-  document.getElementById("importFile").addEventListener("change", (e)=>{
-    const r = new FileReader();
-    r.onload = ()=>{
-      try{
-        const parsed = JSON.parse(r.result);
-        if(typeof parsed==='object' && parsed){
-          tasks = parsed; saveToStorage(); renderAllTasks();
-        } else alert("Invalid JSON.");
-      }catch{ alert("Could not parse JSON."); }
-    };
-    r.readAsText(e.target.files[0]);
-  });
-  document.getElementById("clearBtn").addEventListener("click", ()=>{
-    if(!confirm("Clear all tasks?")) return;
-    tasks={}; for(const d of DAYS) tasks[d]=[];
-    saveToStorage(); renderAllTasks();
+
+  // Reposition tasks with the new scale
+  DAYS.forEach(day=>{
+    const dayEl = document.getElementById(`day-${day}`);
+    tasks[day].forEach(t=>{
+      const el = dayEl.querySelector(`.task[data-id="${t.id}"]`);
+      if(!el) return;
+      el.style.top = `${minutesToY(t.startMin)}px`;
+      el.style.height = `${t.durationMin * PIXELS_PER_MINUTE}px`;
+      autosizeTaskText(el);
+    });
   });
 }
 
-function wireAddButtons(){
-  document.querySelectorAll('.addBtn').forEach(b=>{
-    b.addEventListener('click', ()=> addTask(b.dataset.day));
-  });
+/***** TEXT AUTOSIZING *****/
+function autosizeAllTaskText(){
+  document.querySelectorAll('.task').forEach(el => autosizeTaskText(el));
 }
+function autosizeTaskText(el){
+  const title = el.querySelector('.task-title') || el;
+  const h = el.clientHeight || 0;
 
-function addTask(day, partial={}){
-  const t = {
-    id: crypto.randomUUID? crypto.randomUUID() : String(Date.now()+Math.random()),
-    title: partial.title ?? DEFAULT_TASK.title,
-    color: partial.color ?? DEFAULT_TASK.color,
-    startMin: partial.startMin ?? DEFAULT_TASK.startMin,
-    durationMin: partial.durationMin ?? DEFAULT_TASK.durationMin
-  };
-  tasks[day].push(t); saveToStorage();
-  renderTask(document.getElementById(`day-${day}`), t);
+  // font size scales with card height (clamped)
+  const fs = Math.max(10, Math.min(16, Math.floor(h * 0.40))); // 10–16px
+  title.style.fontSize = `${fs}px`;
+  title.style.lineHeight = '1.2';
+
+  // compute how many lines fit and clamp
+  const lines = Math.max(1, Math.floor((h - 8) / (fs * 1.2)));
+  title.style.display = '-webkit-box';
+  title.style.webkitBoxOrient = 'vertical';
+  title.style.setProperty('-webkit-line-clamp', String(lines));
 }
 
 /***** NOW LINE (visual only) *****/
@@ -310,6 +335,51 @@ function drawNowLine(){
   }
 }
 
+/***** BUTTONS *****/
+function wireTopButtons(){
+  document.getElementById("exportBtn").addEventListener("click", ()=>{
+    const data = "data:text/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(tasks,null,2));
+    const a = document.createElement("a"); a.href=data; a.download="planner.json"; a.click();
+  });
+  document.getElementById("importBtn").addEventListener("click", ()=> document.getElementById("importFile").click());
+  document.getElementById("importFile").addEventListener("change", (e)=>{
+    const r = new FileReader();
+    r.onload = ()=>{
+      try{
+        const parsed = JSON.parse(r.result);
+        if(typeof parsed==='object' && parsed){
+          tasks = parsed; saveToStorage(); renderAllTasks(); fitCalendarToViewport();
+        } else alert("Invalid JSON.");
+      }catch{ alert("Could not parse JSON."); }
+    };
+    r.readAsText(e.target.files[0]);
+  });
+  document.getElementById("clearBtn").addEventListener("click", ()=>{
+    if(!confirm("Clear all tasks?")) return;
+    tasks={}; for(const d of DAYS) tasks[d]=[];
+    saveToStorage(); renderAllTasks(); fitCalendarToViewport();
+  });
+}
+
+function wireAddButtons(){
+  document.querySelectorAll('.addBtn').forEach(b=>{
+    b.addEventListener('click', ()=> addTask(b.dataset.day));
+  });
+}
+
+function addTask(day, partial={}){
+  const t = {
+    id: crypto.randomUUID? crypto.randomUUID() : String(Date.now()+Math.random()),
+    title: partial.title ?? DEFAULT_TASK.title,
+    color: partial.color ?? DEFAULT_TASK.color,
+    startMin: partial.startMin ?? DEFAULT_TASK.startMin,
+    durationMin: partial.durationMin ?? DEFAULT_TASK.durationMin
+  };
+  tasks[day].push(t); saveToStorage();
+  renderTask(document.getElementById(`day-${day}`), t);
+  fitCalendarToViewport(); // ensure fonts/positions correct with current scale
+}
+
 /***** HELPERS *****/
 function formatHour(h){
   const ampm = h<12 ? "AM":"PM";
@@ -325,6 +395,7 @@ function snapPx(px){ return Math.round(px / SLOT_HEIGHT) * SLOT_HEIGHT; }
 function minTaskHeight(){ return SLOT_HEIGHT; }
 function dayHeight(){ return (END_HOUR-START_HOUR)*60*PIXELS_PER_MINUTE; }
 function clamp(v,min,max){ return Math.max(min, Math.min(max,v)); }
+function debounce(fn,ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; }
 
 const COLORS = ["color-blue","color-green","color-yellow","color-pink","color-purple","color-orange"];
 function cycleColor(task, el){
