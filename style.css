@@ -1,140 +1,104 @@
 :root{
-  --bg: #f7fafc;
-  --card: #ffffff;
-  --ink: #0f172a;
-  --dash: #e2e8f0;
-  --ring: #60a5fa;
+  --sheet: #fff;
+  --grid: #eaecef;     /* hour lines */
+  --grid-half: #f3f4f6;/* half-hour lines */
+  --ink: #1f1f1f;
+  --muted: #5f6368;
+  --slot-height: 24px; /* 30-min row height (slightly taller like Google) */
+  --start-hour: 5;
+  --end-hour: 23;
+  --now: #ea4335;      /* Google red */
 }
 
-* { box-sizing: border-box; }
-html, body { height: 100%; }
-body {
-  background: linear-gradient(180deg, var(--bg), #eef2f7);
-  color: var(--ink);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* ---- general ---- */
+*{box-sizing:border-box}
+html,body{height:100%}
+body{color:var(--ink)}
+
+/* ---- top buttons ---- */
+.btn-pill{
+  padding:.55rem .9rem;border-radius:999px;font-weight:600;
+  box-shadow:0 1px 0 rgba(0,0,0,.05);
+}
+.btn-pill:active{transform:translateY(1px)}
+
+/* ---- calendar shell ---- */
+.calendar{background:var(--sheet)}
+.cal-head{position:sticky;top:0;z-index:2;background:var(--sheet);border-bottom:1px solid var(--grid)}
+.cell{padding:.9rem .75rem}
+.time-head{color:var(--muted)}
+.day-head{display:flex;align-items:center;justify-content:center}
+.day-head span{
+  font-weight:700;color:#202124;
+  padding:.3rem .7rem;border-radius:999px;
 }
 
-/* The vertical working area height; JS reads this too */
-:root {
-  --slot-height: 20px;   /* height for 30 minutes */
-  --start-hour: 5;       /* 5:00 */
-  --end-hour: 23;        /* 23:00 */
+/* ---- timeline + grid ---- */
+.timeline-wrap{background:var(--sheet);border-right:1px solid var(--grid)}
+.timeline{
+  position:relative;padding-top:0;
+}
+.time-row{height:var(--slot-height);position:relative;border-top:1px solid var(--grid-half)}
+.time-row.hour{border-top:1px solid var(--grid)}
+.time-label{
+  position:absolute;top:-.6rem;left:.75rem;font-size:.72rem;color:var(--muted);
+  background:var(--sheet);padding:0 .35rem;border-radius:6px;
 }
 
-/* ===== Timeline ===== */
-.timeline {
-  position: relative;
-  background: var(--card);
-  border-radius: 12px;
-  padding: 6px 0;
-  outline: 2px dashed var(--dash);
-  outline-offset: -8px;
-  overflow: hidden;
+/* ---- day columns ---- */
+.day-col{border-right:1px solid var(--grid);background:var(--sheet)}
+.day{
+  position:relative;
+  height:calc((var(--end-hour) - var(--start-hour)) * 2 * var(--slot-height));
+}
+.day .grid-row{
+  pointer-events:none;position:absolute;left:0;right:0;height:1px;background:var(--grid-half)
+}
+.day .grid-row.hour{background:var(--grid)}
+
+/* current time line */
+.now-line{
+  position:absolute;left:0;right:0;height:2px;background:var(--now);
+  box-shadow:0 0 0 1px var(--now);
+}
+.now-dot{
+  position:absolute;left:-4px;top:-3px;width:8px;height:8px;background:var(--now);border-radius:50%;
 }
 
-/* One “row” per 30 minutes for the time grid */
-.time-row {
-  position: relative;
-  height: var(--slot-height);
-  border-top: 1px dashed #e5e7eb; /* light line for every 30 min */
+/* ---- events (tasks) ---- */
+.task{
+  position:absolute;left:6px;right:6px;
+  min-height:calc(var(--slot-height)); /* 30 min */
+  background:#f6fafe;                  /* light chip */
+  border:1px solid #d2e3fc;
+  border-left:6px solid #1a73e8;       /* default accent */
+  border-radius:10px;
+  padding:6px 8px 6px 10px;
+  font-weight:600;font-size:.86rem;line-height:1.2;
+  color:#202124;
+  box-shadow:0 1px 2px rgba(0,0,0,.05);
+  user-select:none;cursor:grab; transition:box-shadow .12s ease, transform .08s ease;
 }
-.time-row.hour {
-  border-top: 1px solid #cbd5e1; /* darker on the hour */
-}
-.time-label {
-  position: absolute;
-  top: -0.6rem;
-  left: 8px;
-  font-size: 0.75rem;
-  color: #475569;
-  background: #ffffff;
-  padding: 0 4px;
-  border-radius: 6px;
-}
+.task:active{cursor:grabbing}
+.task.dragging{transform:scale(1.01);box-shadow:0 6px 14px rgba(0,0,0,.15)}
 
-/* ===== Day Columns ===== */
-.day-col {
-  background: var(--card);
-  border-radius: 14px;
-  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06);
-  padding: 0;
-  overflow: hidden;
+/* resize handles (subtle like Google) */
+.task .resize-handle{
+  position:absolute;left:14px;right:14px;height:6px;border-radius:999px;background:rgba(60,64,67,.18);
 }
+.task .resize-handle.top{top:-4px}
+.task .resize-handle.bottom{bottom:-4px}
 
-/* The scheduling canvas inside each day */
-.day {
-  position: relative;
-  background: #f8fafc;
-  outline: 2px dashed var(--dash);
-  outline-offset: -8px;
-  height: calc((var(--end-hour) - var(--start-hour)) * 2 * var(--slot-height)); /* hours * 2 slots/hour */
-  /* Scroll if content extends (if you enable bigger ranges later) */
-  overflow-y: hidden;
+/* color accents (border-left + softer fill) */
+.color-blue   { border-left-color:#1a73e8; background:#eef3fe; border-color:#d2e3fc; }
+.color-green  { border-left-color:#188038; background:#e8f5eb; border-color:#c8e6ca; }
+.color-yellow { border-left-color:#f9ab00; background:#fff7e0; border-color:#fde293; }
+.color-pink   { border-left-color:#d01884; background:#fde7f3; border-color:#f6c1dc; }
+.color-purple { border-left-color:#9334e6; background:#f3e8ff; border-color:#e2c8ff; }
+.color-orange { border-left-color:#f29900; background:#fff1e6; border-color:#ffd6a8; }
+
+/* add buttons */
+.add-pill{
+  background:#e8f0fe;color:#1a73e8;padding:.4rem .9rem;border-radius:999px;font-weight:600
 }
-
-/* Horizontal grid lines (mirror timeline) */
-.day .grid-row {
-  pointer-events: none;
-  position: absolute;
-  left: 0; right: 0;
-  height: 1px;
-  background: #e5e7eb;
-  opacity: 0.6;
-}
-.day .grid-row.hour {
-  background: #cbd5e1;
-  opacity: 1;
-}
-
-/* ===== Tasks ===== */
-.task {
-  position: absolute;
-  left: 6px;
-  right: 6px;
-  min-height: calc(var(--slot-height)); /* at least 30 minutes */
-  border-radius: 12px;
-  padding: 10px 12px;
-  font-weight: 600;
-  line-height: 1.25;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
-  user-select: none;
-  cursor: grab;
-  transition: box-shadow .12s ease, opacity .12s ease, transform .12s ease;
-  will-change: transform, height, top;
-  border: 2px solid transparent;
-}
-
-.task:active { cursor: grabbing; }
-
-.task.dragging {
-  opacity: 0.95;
-  transform: scale(1.01);
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
-  border-color: var(--ring);
-}
-
-/* Resize handles (top/bottom) */
-.task .resize-handle {
-  position: absolute;
-  left: 16px;
-  right: 16px;
-  height: 8px;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.14);
-  opacity: 0.7;
-}
-.task .resize-handle.top { top: -4px; }
-.task .resize-handle.bottom { bottom: -4px; }
-
-/* Simple palette (you can extend) */
-.bg-yellow-200 { background: #fef9c3; }
-.bg-blue-200   { background: #bfdbfe; }
-.bg-green-200  { background: #bbf7d0; }
-.bg-pink-200   { background: #fbcfe8; }
-.bg-purple-200 { background: #ddd6fe; }
-.bg-orange-200 { background: #fed7aa; }
-
-/* Buttons */
-button { transition: transform .08s ease, box-shadow .12s ease; }
-button:active { transform: translateY(1px); }
+.add-pill:active{transform:translateY(1px)}
