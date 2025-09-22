@@ -1,95 +1,136 @@
+/* ===========================
+   Google Calendar–style Weekly Planner
+   =========================== */
+
 :root{
   --sheet: #fff;
-  --grid: #eaecef;     /* hour lines */
-  --grid-half: #f3f4f6;/* half-hour lines */
+  --grid: #eaecef;       /* hour lines */
+  --grid-half: #f3f4f6;  /* half-hour lines */
   --ink: #1f1f1f;
   --muted: #5f6368;
-  --slot-height: 24px; /* 30-min row height (slightly taller like Google) */
+  --slot-height: 24px;   /* 30-min row height */
   --start-hour: 5;
   --end-hour: 23;
-  --now: #ea4335;      /* Google red */
+  --now: #ea4335;        /* red "now" line */
 }
 
 /* ---- general ---- */
-*{box-sizing:border-box}
-html,body{height:100%}
-body{color:var(--ink)}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { color: var(--ink); background:#f1f3f4; }
 
 /* ---- top buttons ---- */
 .btn-pill{
-  padding:.55rem .9rem;border-radius:999px;font-weight:600;
+  padding:.55rem .9rem;
+  border-radius:999px;
+  font-weight:600;
   box-shadow:0 1px 0 rgba(0,0,0,.05);
 }
-.btn-pill:active{transform:translateY(1px)}
+.btn-pill:active{ transform: translateY(1px); }
 
 /* ---- calendar shell ---- */
-.calendar{background:var(--sheet)}
-.cal-head{position:sticky;top:0;z-index:2;background:var(--sheet);border-bottom:1px solid var(--grid)}
-.cell{padding:.9rem .75rem}
-.time-head{color:var(--muted)}
-.day-head{display:flex;align-items:center;justify-content:center}
+.calendar{
+  background:var(--sheet);
+  border-radius:1rem;
+  box-shadow:0 10px 30px rgba(0,0,0,.06);
+  overflow:hidden;
+}
+.cal-head{
+  position:sticky; top:0; z-index:2;
+  background:var(--sheet);
+  border-bottom:1px solid var(--grid);
+}
+.cell{ padding:.9rem .75rem; }
+.time-head{ color:var(--muted); }
+.day-head{ display:flex; align-items:center; justify-content:center; }
 .day-head span{
-  font-weight:700;color:#202124;
-  padding:.3rem .7rem;border-radius:999px;
+  font-weight:700; color:#202124;
+  padding:.3rem .7rem; border-radius:999px;
 }
 
 /* ---- timeline + grid ---- */
-.timeline-wrap{background:var(--sheet);border-right:1px solid var(--grid)}
-.timeline{
-  position:relative;padding-top:0;
+.timeline-wrap{
+  background:var(--sheet);
+  border-right:1px solid var(--grid);
 }
-.time-row{height:var(--slot-height);position:relative;border-top:1px solid var(--grid-half)}
-.time-row.hour{border-top:1px solid var(--grid)}
+.timeline{ position:relative; }
+.time-row{
+  height:var(--slot-height);
+  position:relative;
+  border-top:1px solid var(--grid-half);
+}
+.time-row.hour{ border-top:1px solid var(--grid); }
 .time-label{
-  position:absolute;top:-.6rem;left:.75rem;font-size:.72rem;color:var(--muted);
-  background:var(--sheet);padding:0 .35rem;border-radius:6px;
+  position:absolute;
+  top:-.6rem; left:.75rem;
+  font-size:.72rem; color:var(--muted);
+  background:var(--sheet);
+  padding:0 .35rem; border-radius:6px;
 }
 
 /* ---- day columns ---- */
-.day-col{border-right:1px solid var(--grid);background:var(--sheet)}
+.day-col{
+  background:var(--sheet);
+  border-right:1px solid var(--grid);
+}
 .day{
   position:relative;
   height:calc((var(--end-hour) - var(--start-hour)) * 2 * var(--slot-height));
 }
 .day .grid-row{
-  pointer-events:none;position:absolute;left:0;right:0;height:1px;background:var(--grid-half)
+  pointer-events:none;
+  position:absolute; left:0; right:0;
+  height:1px; background:var(--grid-half);
 }
-.day .grid-row.hour{background:var(--grid)}
+.day .grid-row.hour{ background:var(--grid); }
 
-/* current time line */
+/* current time line (visual) */
 .now-line{
-  position:absolute;left:0;right:0;height:2px;background:var(--now);
+  position:absolute; left:0; right:0;
+  height:2px; background:var(--now);
   box-shadow:0 0 0 1px var(--now);
 }
 .now-dot{
-  position:absolute;left:-4px;top:-3px;width:8px;height:8px;background:var(--now);border-radius:50%;
+  position:absolute; left:-4px; top:-3px;
+  width:8px; height:8px; background:var(--now); border-radius:50%;
 }
 
-/* ---- events (tasks) ---- */
+/* ---- event/task cards ---- */
 .task{
-  position:absolute;left:6px;right:6px;
-  min-height:calc(var(--slot-height)); /* 30 min */
-  background:#f6fafe;                  /* light chip */
+  position:absolute;
+  left:6px; right:6px;
+  min-height:calc(var(--slot-height)); /* 30 minutes min */
+  background:#f6fafe;                  /* soft chip */
   border:1px solid #d2e3fc;
   border-left:6px solid #1a73e8;       /* default accent */
   border-radius:10px;
   padding:6px 8px 6px 10px;
-  font-weight:600;font-size:.86rem;line-height:1.2;
+  font-weight:600; font-size:.86rem; line-height:1.2;
   color:#202124;
   box-shadow:0 1px 2px rgba(0,0,0,.05);
-  user-select:none;cursor:grab; transition:box-shadow .12s ease, transform .08s ease;
+  user-select:none; cursor:grab;
+  transition: box-shadow .12s ease, transform .08s ease;
 }
-.task:active{cursor:grabbing}
-.task.dragging{transform:scale(1.01);box-shadow:0 6px 14px rgba(0,0,0,.15)}
+.task:active{ cursor:grabbing; }
+.task.dragging{
+  transform:scale(1.01);
+  box-shadow:0 6px 14px rgba(0,0,0,.15);
+}
 
-/* resize handles (subtle like Google) */
+/* resize handles (explicit, interactive) */
 .task .resize-handle{
-  position:absolute;left:14px;right:14px;height:6px;border-radius:999px;background:rgba(60,64,67,.18);
+  position:absolute;
+  left:14px; right:14px;
+  height:6px; border-radius:999px;
+  background:rgba(60,64,67,.18);
+  /* >>> important for working resize <<< */
+  cursor: ns-resize;
+  pointer-events: auto;
 }
-.task .resize-handle.top{top:-4px}
-.task .resize-handle.bottom{bottom:-4px}
+.task .resize-handle.top{ top:-4px; }
+.task .resize-handle.bottom{ bottom:-4px; }
 
-/* color accents (border-left + softer fill) */
+/* ---- color palettes (left bar + soft fill) ---- */
 .color-blue   { border-left-color:#1a73e8; background:#eef3fe; border-color:#d2e3fc; }
 .color-green  { border-left-color:#188038; background:#e8f5eb; border-color:#c8e6ca; }
 .color-yellow { border-left-color:#f9ab00; background:#fff7e0; border-color:#fde293; }
@@ -97,8 +138,12 @@ body{color:var(--ink)}
 .color-purple { border-left-color:#9334e6; background:#f3e8ff; border-color:#e2c8ff; }
 .color-orange { border-left-color:#f29900; background:#fff1e6; border-color:#ffd6a8; }
 
-/* add buttons */
+/* ---- small “+ Add” pills under headers ---- */
 .add-pill{
-  background:#e8f0fe;color:#1a73e8;padding:.4rem .9rem;border-radius:999px;font-weight:600
+  background:#e8f0fe;
+  color:#1a73e8;
+  padding:.4rem .9rem;
+  border-radius:999px;
+  font-weight:600;
 }
-.add-pill:active{transform:translateY(1px)}
+.add-pill:active{ transform:translateY(1px); }
