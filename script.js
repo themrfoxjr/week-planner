@@ -11,9 +11,9 @@ const PIXELS_PER_MINUTE = 1 / MINUTES_PER_PIXEL;
 
 const DEFAULT_TASK = {
   title: "New Task",
-  color: "color-blue",
-  startMin: (9 - START_HOUR) * 60,
-  durationMin: 60
+  color: "color-blue",                 // Google-y palette class (see CSS)
+  startMin: (9 - START_HOUR) * 60,     // defaults to 9:00 AM
+  durationMin: 60                      // defaults to 60 min
 };
 
 let tasks = loadFromStorage(); // { [day]: Task[] }
@@ -106,9 +106,11 @@ function renderTask(dayEl, task){
 
   enableInteract(node);
 
+  // click: cycle color
   node.addEventListener('click', e=>{
     if(e.detail===1){ cycleColor(task,node); saveToStorage(); }
   });
+  // dblclick: rename
   node.addEventListener('dblclick', ()=>{
     const t = prompt("Task name:", task.title);
     if(t!==null){
@@ -122,44 +124,59 @@ function renderTask(dayEl, task){
   dayEl.appendChild(node);
 }
 
-/***** INTERACT: DRAG + RESIZE *****/
+/***** INTERACT: DRAG + RESIZE *****
+  - DRAG uses transform for live feedback, then commits to `top` on end.
+  - RESIZE captures true edges (top/bottom) and uses deltaRect.
+************************************/
 function enableInteract(el){
-  // LIVE drag feedback: accumulate top with event.dy
+  // DRAG
   interact(el).draggable({
-    inertia:false,
-    listeners:{
-      start(){
-        el.classList.add('dragging');
-        el._dragTop = parseFloat(el.style.top) || 0;
-      },
-      move(evt){
-        el._dragTop = clamp(el._dragTop + (evt.dy || 0), 0, dayHeight() - minTaskHeight());
-        el.style.top = `${el._dragTop}px`;
-      },
-      end(){
-        el.classList.remove('dragging');
-        snapAndPersist(el);
-      }
-    }
-  });
-
-  // Reliable resizing using the explicit handles + deltaRect
-  interact(el).resizable({
-    edges: { top: '.resize-handle.top', bottom: '.resize-handle.bottom' },
     inertia:false
   })
-  .on('resizestart', ()=> el.classList.add('dragging'))
+  .on('dragstart', (evt)=>{
+    el.classList.add('dragging');
+    // store starting top and reset live translation
+    el._startTop = parseFloat(el.style.top) || 0;
+    el._dy = 0;
+    el.style.transform = 'translateY(0px)';
+  })
+  .on('dragmove', (evt)=>{
+    // live feedback via translateY
+    el._dy += evt.dy || 0;
+    el.style.transform = `translateY(${el._dy}px)`;
+  })
+  .on('dragend', (evt)=>{
+    // commit: remove transform and write snapped top
+    const height = parseFloat(el.style.height) || minTaskHeight();
+    const targetTop = clamp(el._startTop + el._dy, 0, dayHeight() - height);
+    el.style.transform = 'translateY(0px)';
+    el.style.top = `${snapPx(targetTop)}px`;
+
+    el.classList.remove('dragging');
+    snapAndPersist(el);
+  });
+
+  // RESIZE (edges, not the whole card)
+  interact(el).resizable({
+    edges: { top: true, bottom: true, left: false, right: false },
+    inertia:false
+  })
+  .on('resizestart', ()=>{
+    // ensure we don't have a leftover drag transform
+    el.style.transform = 'translateY(0px)';
+    el.classList.add('dragging');
+  })
   .on('resizemove', (evt)=>{
-    const currentTop = parseFloat(el.style.top) || 0;
-    const currentH   = parseFloat(el.style.height) || minTaskHeight();
+    const curTop = parseFloat(el.style.top) || 0;
+    const curH   = parseFloat(el.style.height) || minTaskHeight();
 
-    // deltaRect gives change since the last move
-    let newTop = currentTop + (evt.deltaRect.top || 0);
-    let newH   = currentH   + (evt.deltaRect.height || 0);
+    // use deltas to grow/shrink; Interact gives us changes since last event
+    let newTop = curTop + (evt.deltaRect.top || 0);
+    let newH   = curH   + (evt.deltaRect.height || 0);
 
-    // clamp within day bounds
+    // keep within day bounds
     newTop = clamp(newTop, 0, dayHeight() - minTaskHeight());
-    newH   = clamp(newH,  minTaskHeight(), dayHeight() - newTop);
+    newH   = clamp(newH,   minTaskHeight(), dayHeight() - newTop);
 
     el.style.top = `${newTop}px`;
     el.style.height = `${newH}px`;
@@ -182,16 +199,20 @@ function setupDropzones(){
       const moved = takeTaskFromDay(from, card.dataset.id);
       if(!moved) return;
 
-      // Add to new day *before* snapping so persistence works
+      // add to new data set first
       tasks[to].push(moved);
 
+      // move DOM
       evt.target.appendChild(card);
       card.dataset.day = to;
 
+      // compute local Y using pointer position
       const rect = evt.target.getBoundingClientRect();
       const y = clamp((evt.dragEvent?.clientY ?? rect.top) - rect.top + evt.target.scrollTop,
                       0, dayHeight()-minTaskHeight());
-      card.style.top = `${y}px`;
+      // commit immediate visual and data
+      card.style.transform = 'translateY(0px)';
+      card.style.top = `${snapPx(y)}px`;
       snapAndPersist(card);
       saveToStorage();
     }
@@ -209,8 +230,9 @@ function snapAndPersist(el){
   const t = findTask(day, el.dataset.id);
   if(!t) return;
 
-  const top = snapPx(parseFloat(el.style.top)||0);
-  const height = Math.max(minTaskHeight(), snapPx(parseFloat(el.style.height)));
+  // snap to 30-min grid
+  const top = snapPx(parseFloat(el.style.top) || 0);
+  const height = Math.max(minTaskHeight(), snapPx(parseFloat(el.style.height) || minTaskHeight()));
   const maxTop = dayHeight() - height;
 
   el.style.top = `${Math.min(top, snapPx(maxTop))}px`;
@@ -219,7 +241,7 @@ function snapAndPersist(el){
   t.startMin    = yToMinutes(parseFloat(el.style.top));
   t.durationMin = Math.max(
     SLOT_MINUTES,
-    Math.round(parseFloat(el.style.height)*MINUTES_PER_PIXEL / SLOT_MINUTES)*SLOT_MINUTES
+    Math.round((parseFloat(el.style.height) * MINUTES_PER_PIXEL) / SLOT_MINUTES) * SLOT_MINUTES
   );
 
   saveToStorage();
