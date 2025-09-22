@@ -1,5 +1,6 @@
 /* ===========================
    Google Calendar–style Weekly Planner
+   Responsive vertically + text autosize support
    =========================== */
 
 :root{
@@ -8,7 +9,7 @@
   --grid-half: #f3f4f6;  /* half-hour lines */
   --ink: #1f1f1f;
   --muted: #5f6368;
-  --slot-height: 24px;   /* 30-min row height */
+  --slot-height: 24px;   /* will be overridden by JS to fit viewport */
   --start-hour: 5;
   --end-hour: 23;
   --now: #ea4335;        /* red "now" line */
@@ -46,6 +47,12 @@ body { color: var(--ink); background:#f1f3f4; }
 .day-head span{
   font-weight:700; color:#202124;
   padding:.3rem .7rem; border-radius:999px;
+}
+
+/* ---- body area gets its height from JS to fill viewport ---- */
+.cal-body{
+  /* JS sets an explicit height so the whole grid (5am–11pm) fits the window */
+  height:auto;
 }
 
 /* ---- timeline + grid ---- */
@@ -105,10 +112,13 @@ body { color: var(--ink); background:#f1f3f4; }
   border-left:6px solid #1a73e8;       /* default accent */
   border-radius:10px;
   padding:6px 8px 6px 10px;
-  font-weight:600; font-size:.86rem; line-height:1.2;
+  /* text & layout */
   color:#202124;
-  box-shadow:0 1px 2px rgba(0,0,0,.05);
   user-select:none; cursor:grab;
+  overflow:hidden;                     /* prevent spill */
+  touch-action: none;
+  will-change: top, height, transform;
+  box-shadow:0 1px 2px rgba(0,0,0,.05);
   transition: box-shadow .12s ease, transform .08s ease;
 }
 .task:active{ cursor:grabbing; }
@@ -117,15 +127,24 @@ body { color: var(--ink); background:#f1f3f4; }
   box-shadow:0 6px 14px rgba(0,0,0,.15);
 }
 
+/* Inner title for clamping/auto-size (font-size set via JS) */
+.task-title{
+  line-height:1.2;
+  display:-webkit-box;
+  -webkit-box-orient: vertical;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  word-break: break-word;
+}
+
 /* resize handles (explicit, interactive) */
 .task .resize-handle{
   position:absolute;
   left:14px; right:14px;
   height:6px; border-radius:999px;
   background:rgba(60,64,67,.18);
-  /* >>> important for working resize <<< */
-  cursor: ns-resize;
-  pointer-events: auto;
+  cursor: ns-resize;           /* ensure proper cursor */
+  pointer-events: auto;        /* allow InteractJS to catch it */
 }
 .task .resize-handle.top{ top:-4px; }
 .task .resize-handle.bottom{ bottom:-4px; }
@@ -147,6 +166,3 @@ body { color: var(--ink); background:#f1f3f4; }
   font-weight:600;
 }
 .add-pill:active{ transform:translateY(1px); }
-.task { touch-action: none; will-change: top, height, transform; }
-.task .resize-handle { cursor: ns-resize; pointer-events: auto; }
-
