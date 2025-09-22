@@ -5,76 +5,70 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Weekly Planner</title>
 
+  <!-- Google-like font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
   <!-- Tailwind (CDN) -->
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 
   <!-- Interact.js for drag/resize/drop -->
   <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
 
-  <!-- Your styles -->
+  <!-- Styles -->
   <link rel="stylesheet" href="style.css">
 </head>
-<body class="bg-gray-100 font-sans">
-  <div class="max-w-7xl mx-auto py-6 px-3">
-    <div class="flex items-center justify-between mb-4">
-      <h1 class="text-3xl font-bold">📅 Weekly Planner</h1>
+<body class="bg-[#f1f3f4] font-sans" style="font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji','Segoe UI Emoji';">
+  <div class="max-w-[1200px] mx-auto py-6 px-3">
+    <!-- Top bar -->
+    <div class="flex items-center justify-between mb-3">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-xl bg-indigo-100 grid place-items-center text-indigo-600 text-lg">📅</div>
+        <h1 class="text-2xl font-bold text-[#1f1f1f]">Weekly Planner</h1>
+      </div>
       <div class="flex gap-2">
-        <button id="exportBtn" class="bg-blue-500 text-white px-3 py-2 rounded-lg shadow">Export JSON</button>
+        <button id="exportBtn" class="btn-pill bg-[#1a73e8] text-white">Export JSON</button>
         <input type="file" id="importFile" class="hidden" />
-        <button id="importBtn" class="bg-green-500 text-white px-3 py-2 rounded-lg shadow">Import JSON</button>
-        <button id="clearBtn" class="bg-red-500 text-white px-3 py-2 rounded-lg shadow">Clear All</button>
+        <button id="importBtn" class="btn-pill bg-[#1e8e3e] text-white">Import JSON</button>
+        <button id="clearBtn"  class="btn-pill bg-[#d93025] text-white">Clear All</button>
       </div>
     </div>
 
-    <!-- Grid: 1 column for timeline + 7 columns for days -->
-    <div id="plannerGrid" class="grid gap-2" style="grid-template-columns: 120px repeat(7, 1fr);">
-      <!-- Left timeline -->
-      <div>
-        <div class="bg-white rounded-lg shadow p-2">
-          <h2 class="font-bold text-center mb-2">Time</h2>
+    <!-- Calendar shell -->
+    <div class="calendar rounded-2xl shadow-lg overflow-hidden">
+      <!-- Header row -->
+      <div class="cal-head grid" style="grid-template-columns: 120px repeat(7, 1fr);">
+        <div class="time-head cell muted">GMT offset</div>
+        <div class="day-head cell"><span>Mon</span></div>
+        <div class="day-head cell"><span>Tue</span></div>
+        <div class="day-head cell"><span>Wed</span></div>
+        <div class="day-head cell"><span>Thu</span></div>
+        <div class="day-head cell"><span>Fri</span></div>
+        <div class="day-head cell"><span>Sat</span></div>
+        <div class="day-head cell"><span>Sun</span></div>
+      </div>
+
+      <!-- Grid body -->
+      <div id="plannerGrid" class="cal-body grid" style="grid-template-columns: 120px repeat(7, 1fr);">
+        <!-- Left timeline -->
+        <div class="timeline-wrap">
           <div id="timeline" class="timeline"></div>
         </div>
+
+        <!-- Days injected here -->
+        <div id="planner" class="contents"></div>
       </div>
-
-      <!-- Day columns are injected here -->
-      <div id="planner" class="contents"></div>
     </div>
 
-    <div class="mt-4 grid" style="grid-template-columns: 120px repeat(7, 1fr);">
-      <div></div>
-      <div class="text-center text-sm text-gray-500">Mon</div>
-      <div class="text-center text-sm text-gray-500">Tue</div>
-      <div class="text-center text-sm text-gray-500">Wed</div>
-      <div class="text-center text-sm text-gray-500">Thu</div>
-      <div class="text-center text-sm text-gray-500">Fri</div>
-      <div class="text-center text-sm text-gray-500">Sat</div>
-      <div class="text-center text-sm text-gray-500">Sun</div>
-    </div>
-
+    <!-- Add buttons row (Google keeps controls light; we tuck + under each header) -->
     <div class="mt-3 grid" style="grid-template-columns: 120px repeat(7, 1fr);">
       <div></div>
-      <!-- Add task buttons per day -->
-      <div class="text-center">
-        <button class="addBtn bg-blue-200 px-2 py-1 rounded" data-day="Mon">+ Add Task</button>
-      </div>
-      <div class="text-center">
-        <button class="addBtn bg-blue-200 px-2 py-1 rounded" data-day="Tue">+ Add Task</button>
-      </div>
-      <div class="text-center">
-        <button class="addBtn bg-blue-200 px-2 py-1 rounded" data-day="Wed">+ Add Task</button>
-      </div>
-      <div class="text-center">
-        <button class="addBtn bg-blue-200 px-2 py-1 rounded" data-day="Thu">+ Add Task</button>
-      </div>
-      <div class="text-center">
-        <button class="addBtn bg-blue-200 px-2 py-1 rounded" data-day="Fri">+ Add Task</button>
-      </div>
-      <div class="text-center">
-        <button class="addBtn bg-blue-200 px-2 py-1 rounded" data-day="Sat">+ Add Task</button>
-      </div>
-      <div class="text-center">
-        <button class="addBtn bg-blue-200 px-2 py-1 rounded" data-day="Sun">+ Add Task</button>
-      </div>
+      <div class="text-center"><button class="addBtn add-pill" data-day="Mon">+ Add</button></div>
+      <div class="text-center"><button class="addBtn add-pill" data-day="Tue">+ Add</button></div>
+      <div class="text-center"><button class="addBtn add-pill" data-day="Wed">+ Add</button></div>
+      <div class="text-center"><button class="addBtn add-pill" data-day="Thu">+ Add</button></div>
+      <div class="text-center"><button class="addBtn add-pill" data-day="Fri">+ Add</button></div>
+      <div class="text-center"><button class="addBtn add-pill" data-day="Sat">+ Add</button></div>
+      <div class="text-center"><button class="addBtn add-pill" data-day="Sun">+ Add</button></div>
     </div>
   </div>
 
