@@ -147,3 +147,6 @@ body { color: var(--ink); background:#f1f3f4; }
   font-weight:600;
 }
 .add-pill:active{ transform:translateY(1px); }
+.task { touch-action: none; will-change: top, height, transform; }
+.task .resize-handle { cursor: ns-resize; pointer-events: auto; }
+
